@@ -1,0 +1,103 @@
+#loading the packages
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(skimr)
+
+library(readr)
+dailyActivity_merged <- read_csv("~/R_projects/How_can_a_wellness_company_play_it_smart/Fitabase Data 4.12.16-5.12.16/dailyActivity_merged.csv")
+sleepDay_merged <- read_csv("~/R_projects/How_can_a_wellness_company_play_it_smart/Fitabase Data 4.12.16-5.12.16/sleepDay_merged.csv")
+weightLogInfo_merged <- read_csv("~/R_projects/How_can_a_wellness_company_play_it_smart/Fitabase Data 4.12.16-5.12.16/weightLogInfo_merged.csv")
+
+str(dailyActivity_merged)
+str(sleepDay_merged)
+str(weightLogInfo_merged)
+
+dailyActivity_merged <- clean_names(dailyActivity_merged)
+sleepDay_merged <- clean_names(sleepDay_merged)
+weightLogInfo_merged <- clean_names(weightLogInfo_merged)
+
+dailyActivity_merged$activity_date <- as.Date(dailyActivity_merged$activity_date, '%m/%d/%y')
+sleepDay_merged$sleep_day <- as.Date(sleepDay_merged$sleep_day, '%m/%d/%y')
+
+weightLogInfo_merged$date <- parse_date_time(weightLogInfo_merged$date, '%m/%d/$y %H:%M:%S %p')
+str(weightLogInfo_merged)
+
+weightLogInfo_merged$is_manual_report <- as.logical(weightLogInfo_merged$is_manual_report)
+str(weightLogInfo_merged)
+
+dailyActivity_merged$day_of_week <- wday(dailyActivity_merged$activity_date, label = T,abbr = T)
+dailyActivity_merged$total_active_hours = round((dailyActivity_merged$very_active_minutes + dailyActivity_merged$fairly_active_minutes + dailyActivity_merged$lightly_active_minutes)/60, digits = 2)
+dailyActivity_merged$sedentary_hours = round((dailyActivity_merged$sedentary_minutes)/60, digits = 2)
+
+sleepDay_merged$hours_in_bed = round((sleepDay_merged$total_time_in_bed)/60, digits = 2)
+sleepDay_merged$hours_asleep = round((sleepDay_merged$total_minutes_asleep)/60, digits = 2)
+sleepDay_merged$time_taken_to_sleep = (sleepDay_merged$total_time_in_bed - sleepDay_merged$total_minutes_asleep)
+
+weightLogInfo_merged <- weightLogInfo_merged %>%
+  select(-c(fat))
+
+  str(weightLogInfo_merged)
+
+weightLogInfo_merged <- weightLogInfo_merged %>%
+  mutate(bmi2 = case_when(
+    bmi > 24.9 ~ 'Overweight',
+    bmi < 18.5 ~ 'Underweight',
+    TRUE ~ 'Healthy'
+  ))
+
+dailyActivity_merged_cleaned <- dailyActivity_merged[!(dailyActivity_merged$calories <=0), ]
+dailyActivity_merged_cleaned <- dailyActivity_merged_cleaned[!(dailyActivity_merged_cleaned$total_active_hours<=0.00), ]
+
+write.csv(dailyActivity_merged_cleaned, file ="~/R_projects/How_can_a_wellness_company_play_it_smart/Fitabase Data 4.12.16-5.12.16/dailyActivity_merged.csv" )
+write.csv(sleepDay_merged, file ="~/R_projects/How_can_a_wellness_company_play_it_smart/Fitabase Data 4.12.16-5.12.16/sleepDay_merged.csv" )
+write.csv(weightLogInfo_merged, file ="~/R_projects/How_can_a_wellness_company_play_it_smart/Fitabase Data 4.12.16-5.12.16/weightLogInfo_merged.csv" )
+
+summary(dailyActivity_merged_cleaned$total_steps)
+summary(dailyActivity_merged_cleaned$sedentary_hours)
+summary(dailyActivity_merged_cleaned$very_active_minutes)
+summary(sleepDay_merged$hours_asleep)
+
+options(scipen = 999)
+ggplot(data = dailyActivity_merged_cleaned)+
+  aes(x = day_of_week, y = total_steps)+
+  geom_col(fill = 'blue')+
+  labs(x = 'Day of week', y = 'Total steps', title = 'Total steps taken in a week')
+ggsave('total_steps.png')
+
+ggplot(data = dailyActivity_merged_cleaned)+
+  aes(x = day_of_week, y = very_active_minutes)+
+  geom_col(fill = 'red')+
+  labs(x = 'Day of week', y = 'Total very active minutes', title = 'Total activity in a week')
+ggsave('total_activity.png')
+
+ggplot(data = dailyActivity_merged_cleaned)+
+  aes(x = day_of_week, y = calories)+
+  geom_col(fill = 'brown')+
+  labs(x = 'Day of week', y = 'Calories Burned', title = 'Total calories burned in a week')
+ggsave('total_calories.png')
+
+ggplot(data = dailyActivity_merged_cleaned)+
+  aes(x = total_active_hours, y = calories)+
+  geom_point(color = 'red')+
+  geom_smooth()+
+  labs(x = 'Total active hours', y = 'calories burned', title = 'calories burned vs active hours')
+ggsave('calories_burned_vs_active_hours.png')
+
+ggplot(data = dailyActivity_merged_cleaned)+
+  aes(x = total_steps, y = calories)+
+  geom_point(color = 'yellow')+
+  geom_smooth()+
+  labs(x = 'Total steps', y = 'calories burned', title = 'calories burned vs total steps')
+ggsave('calories_burned_vs_total_steps.png')
+
+ggplot(data = dailyActivity_merged_cleaned)+
+  aes(x = sedentary_hours, y = calories)+
+  geom_point(color = 'green')+
+  geom_smooth()+
+  labs(x = 'Sedentary hours', y = 'calories burned', title = 'calories burned vs sedentary hours')
+ggsave('calories_burned_vs_sedentary_hours.png')
+
+nrow(filter(distinct(weightLogInfo_merged, id, .keep_all = T),bmi2 == 'Healthy'))
+nrow(filter(distinct(weightLogInfo_merged, id, .keep_all = T),bmi2 == 'Underweight'))
+distinct(weightLogInfo_merged, id, .keep_all = T)
